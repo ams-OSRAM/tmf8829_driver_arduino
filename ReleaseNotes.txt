@@ -1,0 +1,32 @@
+Release Notes tmf8829 arduino uno driver
+----------------------------------------
+  
+v1 
+- initial I2C communication working at 2000000 baud
+- application can measure and report result (headers == level 2) by default. 
+- full result reporting requires that the log level is increased: 
+// to increase/decrease logging
+const uint8_t logLevels[ NR_LOG_LEVELS ] = 
+{ TMF8829_LOG_LEVEL_NONE						// level 0
+, TMF8829_LOG_LEVEL_ERROR						// level 1
+, TMF8829_LOG_LEVEL_RESULTS_HEADER				// level 2
+, TMF8829_LOG_LEVEL_RESULTS						// level 3
+, TMF8829_LOG_LEVEL_CLK_CORRECTION
+, TMF8829_LOG_LEVEL_INFO
+, TMF8829_LOG_LEVEL_VERBOSE
+, TMF8829_LOG_LEVEL_I2C
+, TMF8829_LOG_LEVEL_DEBUG
+};
+
+- known limitation: binary configuration is not working 
+
+v1.2
+- binary buffer size increased
+- wait times for BL commands
+- enable only with firmware download
+- bugfix in wakeup,
+- for clock correction, tmf8826 ticks changed
+- some cleanup
+v1.2.1
+- Clock correction working
+
