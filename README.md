@@ -50,6 +50,22 @@ Visulisation of histograms is only possible for FP-mode 8x8 ond FP-mode 16x16 wi
 
 The logger could be used to store the data in json format.
 
+Note: The default BAUDRATE with 2000000 could show communication errors.
+In such a case, the zmq server reopens the connection to the Arduino.
+To get rid of this issue, the BAUDRATE must be reduced (1000000 baud should be sufficient). 
+
+
+#### Using the Demonstrator with an Arduino Zero
+
+The Arduino Zero must be programmed with BAUDRATE 1000000.
+The zmq server tries to find an Arduino Uno. If no device is found, the zmq server tries to find an Arduino Zero.
+
+#### Using the Demonstrator with an other Arduino
+The python sources for the zmq server could be downloaded.
+The function **device_connected** could be extented for other devices.
+Add the search for the new device. The USB VID:PID must be known. See the connected com ports, when the server is started.
+
+
 
 ## UART and command line interpreter  
 

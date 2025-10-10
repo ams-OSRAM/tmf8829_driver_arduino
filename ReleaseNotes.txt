@@ -30,3 +30,5 @@ v1.2
 v1.2.1
 - Clock correction working
 
+v1.2.2
+- new hex file
