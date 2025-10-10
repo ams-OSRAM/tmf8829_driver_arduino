@@ -73,10 +73,10 @@ uint32_t getSysTick( );
 
 /** @brief Function reads a single byte from the given address. This is only needed on 
  * systems that have special memory access methods for constant segments. Like e.g. Arduino Uno
- *  @param[in] ptr to memory to read from
+ *  @param[in] address to memory to read from
  * \return single byte from the given address 
  */
-uint8_t readProgramMemoryByte( const uint8_t * ptr );
+uint8_t readProgramMemoryByte( uint32_t address );
 
 /** @brief Function sets the enable pin HIGH. Note that the enable pin must be configured
  * for output (with e.g. function pinOutput)

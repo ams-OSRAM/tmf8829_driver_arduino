@@ -22,9 +22,8 @@ uint32_t getSysTick ( )
   return micros( );
 }
 
-uint8_t readProgramMemoryByte ( const uint8_t * ptr )
+uint8_t readProgramMemoryByte ( uint32_t address )
 {
-  uint32_t address = (uint32_t)ptr;
   return pgm_read_byte( address );
 }
 

@@ -18,9 +18,10 @@
 /** Application version number
  * x .. not used until DRIVER version 1.2
  * 1 .. update to clock correction feature
+ * 2 .. new image file 
 */
 
-#define TMF8829_APPLICATION_MINOR_VERSION    1
+#define TMF8829_APPLICATION_MINOR_VERSION    2
 
 
 #define NR_OF_MEAS_CFGS 9 // number of preconfiguration commads that are available, see TMF8829_CMD_STAT 
