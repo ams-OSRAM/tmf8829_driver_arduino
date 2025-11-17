@@ -6,7 +6,7 @@
 *                                                                                                 *
 **************************************************************************************************/
 
-/* tmf8829 arduino uno sample program */
+/* TMF8829 Arduino Uno sample program */
 
 // ---------------------------------------------- includes ----------------------------------------
 #include "tmf8829_shim.h"
@@ -18,37 +18,37 @@
 /** Application version number
  * x .. not used until DRIVER version 1.2
  * 1 .. update to clock correction feature
- * 2 .. new image file 
+ * 2 .. new image file
+ * 3 .. new image file 1.2.194
+     .. more documentation added to application 
 */
+#define TMF8829_APPLICATION_MINOR_VERSION    3
 
-#define TMF8829_APPLICATION_MINOR_VERSION    2
 
+#define NR_OF_MEAS_CFGS 9 /**< number of preconfiguration commands that are available, see TMF8829_CMD_STAT */
 
-#define NR_OF_MEAS_CFGS 9 // number of preconfiguration commads that are available, see TMF8829_CMD_STAT 
+/* tmf application states */
+#define TMF8829_STATE_DISABLED      0 /**< application status, device is disabled */
+#define TMF8829_STATE_STANDBY       1 /**< application status, device in standby */
+#define TMF8829_STATE_STOPPED       2 /**< application status, device in active mode, but no measurement ongoing */
+#define TMF8829_STATE_MEASURE       3 /**< application status, device is doing measurements */
+#define TMF8829_STATE_ERROR         4 /**< application status in error mode, device in unexpected behaviour */
 
-// tmf application states
-#define TMF8829_STATE_DISABLED      0
-#define TMF8829_STATE_STANDBY       1     
-#define TMF8829_STATE_STOPPED       2
-#define TMF8829_STATE_MEASURE       3
-#define TMF8829_STATE_ERROR         4
+#define NR_LOG_LEVELS               9 /**< number of log-levels in application */
 
-#define NR_LOG_LEVELS               9 // number of log-levels in array
+#define NR_REGS_PER_LINE            8 /**< number of registers that are printed in the dump on one line */
 
-// number of register that are printed in the dump on one line
-#define NR_REGS_PER_LINE            8
+#define TMF8829_BINARY_BUF_SIZE     ( TMF8829_CFG_PAGE_SIZE + 5 ) /**< maximum binary command payload size with 5 spare bytes */
 
-// maximum binary command payload size
-#define TMF8829_BINARY_BUF_SIZE     ( TMF8829_CFG_PAGE_SIZE + 5 ) //maximum size and 5 spare bytes
-
-// binary command identifiers
-#define TMF8829_BINARY_CMD_CONFIGURE      0x31  // sets arbitrary configuration
-#define TMF8829_BINARY_CMD_PRE_CONFIGURE  0x32  // sets pre configuration
-#define TMF8829_BINARY_CMD_CHAR_MODE      0x00  // not a valid command identifier, indicates that the application is in character input mode
-#define TMF8829_BINARY_CMD_PENDING        0xFF  // not a valid command identifier, indicates that the application is in binary input mode awaiting a command identifier
+/* binary command identifiers */
+#define TMF8829_BINARY_CMD_CONFIGURE      0x31  /**< sets arbitrary configuration */
+#define TMF8829_BINARY_CMD_PRE_CONFIGURE  0x32  /**< sets pre-configuration */
+#define TMF8829_BINARY_CMD_CHAR_MODE      0x00  /**< not a valid command identifier, indicates that the application is in character input mode */
+#define TMF8829_BINARY_CMD_PENDING        0xFF  /**< not a valid command identifier, indicates that the application is in binary input mode awaiting a command identifier */
 
 // ---------------------------------------------- constants -----------------------------------------
-// to increase/decrease logging
+/** @brief logLevels to increase/decrease logging
+ */
 const uint8_t logLevels[ NR_LOG_LEVELS ] = 
 { TMF8829_LOG_LEVEL_NONE
 , TMF8829_LOG_LEVEL_ERROR
@@ -61,6 +61,8 @@ const uint8_t logLevels[ NR_LOG_LEVELS ] =
 , TMF8829_LOG_LEVEL_DEBUG
 };
 
+/** @brief measCfg holds the supported pre-configurations by the TMF8829 device.
+ */
 const int measCfg[NR_OF_MEAS_CFGS] = 
 {
   TMF8829_CMD_STAT__cmd_stat__CMD_LOAD_CFG_8X8, 
@@ -76,15 +78,15 @@ const int measCfg[NR_OF_MEAS_CFGS] =
 
 // ---------------------------------------------- variables -----------------------------------------
 
-tmf8829Driver tmf8829;            // instances of tmf8829
-uint8_t logLevel;                 // how chatty the program is 
-int8_t stateTmf8829;              // current state of the device
-int8_t configNr;                  // this sample application has only a few configurations it will loop through, the variable keeps track of that 
-int8_t clkCorrectionOn;           // if non-zero clock correction is on
-volatile uint8_t irqTriggered;    // interrupt is triggered or not
-uint8_t binaryCmd;                // currently active binary command identifier (if any)
-uint8_t binaryBufFill;            // fill level of the binary command payload buffer
-uint8_t binaryBuf[TMF8829_BINARY_BUF_SIZE]; // binary command payload buffer
+tmf8829Driver tmf8829;            /**< instances of tmf8829 driver */
+uint8_t logLevel;                 /**< current log level of the application */
+int8_t stateTmf8829;              /**< current state of the device */
+int8_t configNr;                  /**< this sample application has only a few configurations it will loop through, the variable keeps track of that */
+int8_t clkCorrectionOn;           /**< if non-zero clock correction is on */
+volatile uint8_t irqTriggered;    /**< interrupt is triggered or not */
+uint8_t binaryCmd;                /**< currently active binary command identifier (if any) */
+uint8_t binaryBufFill;            /**< fill level of the binary command payload buffer */
+uint8_t binaryBuf[TMF8829_BINARY_BUF_SIZE]; /**< binary command payload buffer */
 
 // ---------------------------------------------- function declaration ------------------------------
 void static printDeviceInfo();
@@ -97,7 +99,9 @@ void static resetAppState();
 /* TMF8829 Device Functions                                                   */
 /******************************************************************************/
 
-// Preconfiguration  eq.: TMF8829_CMD_STAT__cmd_stat__CMD_LOAD_CFG_8X8
+/** @brief  Function will do a pre-configuration.
+ * @param cfgNr ... preconfiguration  eq.: TMF8829_CMD_STAT__cmd_stat__CMD_LOAD_CFG_8X8
+ */
 void preconfigure ( int8_t cfgNr )
 {
   int8_t stat = tmf8829Command(&tmf8829, cfgNr);
@@ -117,8 +121,9 @@ void preconfigure ( int8_t cfgNr )
   PRINT_LN( );
 }
 
-
-// get configuration of tmf8829 and print the configuration
+/** @brief  Function to get the configuration from the Tmf8829 device.
+ *  After that the configuration is printed.
+ */
 void getConfiguration ( )
 {
   if ( stateTmf8829 == TMF8829_STATE_STOPPED )
@@ -134,7 +139,13 @@ void getConfiguration ( )
   }
 }
 
-// enable device, download firmware and start Ram App
+/** @brief  Function to enable the Tmf8829 device with a firmware download and Ram application start.
+  * The configuration and device specific information is read and printed.
+  * This function does the initialize steps for the application too.
+  * @param imageStartAddress ... tmf8829 memory start address 
+  * @param image ... pointer to the image
+  * @param imageSizeInBytes ... image size
+ */
 void enable ( uint32_t imageStartAddress, const unsigned char * image, int32_t imageSizeInBytes )
 {
   int8_t status;
@@ -181,7 +192,8 @@ void enable ( uint32_t imageStartAddress, const unsigned char * image, int32_t i
   }
 }
 
-// enable histogram dumbing
+/** @brief  Function to set the histogram dumping configuration on the Tmf8829 device.
+*/
 void histogramDumping ( ) 
 {
   if ( stateTmf8829 == TMF8829_STATE_STOPPED )
@@ -219,7 +231,8 @@ void histogramDumping ( )
   }
 }
 
-// start measurement
+/** @brief  Function will start a measurement.
+ */
 void measure ( )
 {
   if ( stateTmf8829 == TMF8829_STATE_STOPPED )
@@ -235,7 +248,8 @@ void measure ( )
   }
 }
 
-// execute a stop measurement
+/** @brief Function will stop a measurement.
+ */
 void stop ( )
 {
   if ( stateTmf8829 == TMF8829_STATE_MEASURE || stateTmf8829 == TMF8829_STATE_STOPPED )
@@ -246,7 +260,8 @@ void stop ( )
   }
 }
 
-// power down by setting PON=0 bit
+/** @brief Function will power down the device by setting POFF=1 bit.
+ */
 void powerDown ( )
 {
   if ( stateTmf8829 == TMF8829_STATE_MEASURE )      // stop a measurement first
@@ -262,7 +277,8 @@ void powerDown ( )
   }
 }
 
-// perform a hardware + software reset
+/** @brief Function to perform a soft reset.
+ */
 void reset ( )
 {
   if ( stateTmf8829 != TMF8829_STATE_DISABLED )
@@ -274,7 +290,8 @@ void reset ( )
   }
 }
 
-// wakeup sequence
+/** @brief Function to perform a wakeup.
+ */
 void wakeup ( )
 {
   if ( stateTmf8829 == TMF8829_STATE_STANDBY )
@@ -291,8 +308,11 @@ void wakeup ( )
   }
 }
 
-// print registers either as c-struct or plain
-// seperator must be either " " or "," 
+/** @brief  Function to read registers and print the content.
+  * @param regAddr ... first register address
+  * @param len ... len of registers to be read and printed
+  * @param seperator ... seperator must be either " " or "," 
+ */
 void printRegisters ( uint8_t regAddr, uint16_t len, char seperator )
 {
   if ( stateTmf8829 != TMF8829_STATE_DISABLED )
@@ -330,7 +350,9 @@ void printRegisters ( uint8_t regAddr, uint16_t len, char seperator )
 /* Application Functions                                                      */
 /******************************************************************************/
 
-// select the next preconfiguration
+/** @brief Function will change the pre-configuration of the Tmf8829 device.
+    Next itemfrom measCfg is used.
+ */
 void nextConfiguration ( )
 {
   if ( stateTmf8829 == TMF8829_STATE_STOPPED )
@@ -349,7 +371,9 @@ void nextConfiguration ( )
   }
 }
 
-// enable/disable clock correction
+/** @brief Function will enable/disable clock correction.
+ */
+
 void clockCorrection ( )
 {
   clkCorrectionOn = !clkCorrectionOn;       // toggle clock correction on/off  
@@ -359,7 +383,8 @@ void clockCorrection ( )
   PRINT_LN( );
 }
 
-// decrease logging level
+/** @brief Function will decrease the log Level.
+ */
 void logLevelDec ( )
 {
   if ( logLevel > 0 )
@@ -372,7 +397,9 @@ void logLevelDec ( )
   PRINT_LN( );
 }
 
-// increase logging level
+/** @brief Function will increase the log Level.
+ */
+
 void logLevelInc ( )
 {
   if ( logLevel < NR_LOG_LEVELS - 1 )
@@ -385,6 +412,9 @@ void logLevelInc ( )
   PRINT_LN( );
 }
 
+/** @brief Function will print the Arduino version,
+ * firmware version, chip version and serial number.
+ */
 void printDeviceInfo ( )
 {
   PRINT_CONST_STR( F(  "TMF8829 Arduino Driver Version " ) );
@@ -407,7 +437,8 @@ void printDeviceInfo ( )
   PRINT_LN( );
 }
 
-// Print the current state (stateTmf8829) in a readable format
+/** @brief Function prints the current state (stateTmf8829) in a readable format
+ */
 void printState ( )
 {
   PRINT_CONST_STR( F(  " state=" ) );
@@ -426,7 +457,24 @@ void printState ( )
 /******************************************************************************/
 /* Binary Input Functions                                                     */
 /******************************************************************************/
-// enters binary input mode
+/* For communication with more than one character the Binary Input Mode must be used instead of the Character Input Mode.
+  
+  The supported binary commands are TMF8829_BINARY_CMD_CONFIGURE and TMF8829_BINARY_CMD_PRE_CONFIGURE.
+
+  Note:
+  The payload for these commands must exactly fit! Too long or too short commands will end in unexpected behaviour of the application.
+  (If a command is too short, the application will not exit the binary mode.)
+  An expected commands payload size is known with the function binaryCmdPayloadSize().
+
+  To enter the mode the character 'b' must be sent first and the function enterBinaryInputMode() is called.
+  As long as data for the command is received, the binary mode is active. The function isInBinaryInputMode() is used to know which mode is active.
+  The incoming data is processed with the function handleBinaryInput(). If the right amount of data is received,
+  the binary command is executed in the function handleCompleteBinaryCmd.
+  The mode is left with the function exitBinaryInputMode().
+ */
+
+/** @brief This function enters the binary input mode
+ */
 void enterBinaryInputMode ( )
 {
   binaryCmd = TMF8829_BINARY_CMD_PENDING;
@@ -435,7 +483,8 @@ void enterBinaryInputMode ( )
   PRINT_LN( );
 }
 
-// leaves binary input mode
+/** @brief This function leaves the binary input mode.
+ */
 void exitBinaryInputMode ( )
 {
   binaryCmd = TMF8829_BINARY_CMD_CHAR_MODE;
@@ -445,7 +494,10 @@ void exitBinaryInputMode ( )
   printState( );
 }
 
-// returns the expected binary command payload size if a valid identifier is passed, -1 if the identifier is invalid
+/** @brief This function returns the expected binary command payload size.
+ *  @param cmd ... the binary command.
+ * \return  expected payload size if a valid identifier is passed, -1 if the identifier is invalid
+ */
 int16_t binaryCmdPayloadSize( uint8_t cmd ) {
   if ( cmd == TMF8829_BINARY_CMD_CONFIGURE )
   {
@@ -462,8 +514,9 @@ int16_t binaryCmdPayloadSize( uint8_t cmd ) {
     return -1;
   }
 }
-
-// returns 1 if in binary input mode, 0 if in character input mode
+/** @brief Function checks for binary input mode.
+ * \return 1 if in binary input mode, 0 if in character input mode
+*/
 int8_t isInBinaryInputMode ( )
 {
   if ( binaryCmd == TMF8829_BINARY_CMD_CHAR_MODE ) {
@@ -473,7 +526,9 @@ int8_t isInBinaryInputMode ( )
   }
 }
 
-// handles a received binary command with payload of the expected size, returns 1 if program termination is requested
+/** @brief This function handles a received binary command with payload of the expected size.
+ * \return  1 if program termination is requested, otherwise 0
+ */
 int8_t handleCompleteBinaryCmd ( )
 {
   if ( stateTmf8829 == TMF8829_STATE_STOPPED && binaryCmd == TMF8829_BINARY_CMD_CONFIGURE)
@@ -516,7 +571,10 @@ int8_t handleCompleteBinaryCmd ( )
   return 0;
 }
 
-// handles a single incoming byte in binary input mode, returns 1 if program termination is requested
+/** @brief This function handles a single incoming byte in binary input mode.
+ *  @param byte ... incoming byte
+ * \return 1 if program termination is requested, otherwise 0
+ */
 int8_t handleBinaryInput ( uint8_t byte )
 {
   if ( binaryCmd == TMF8829_BINARY_CMD_PENDING )
@@ -560,8 +618,10 @@ int8_t handleBinaryInput ( uint8_t byte )
 /******************************************************************************/
 /* Character Input Functions                                                  */
 /******************************************************************************/
-#define DELAY_PRINT_HELP  10000
-// Function prints a help screen
+#define DELAY_PRINT_HELP  10000 /**< delay between the prints */
+
+/** @brief  Function prints a help screen.
+ */
 void printHelp ( )
 {
   delayInMicroseconds( DELAY_PRINT_HELP );
@@ -600,7 +660,9 @@ void printHelp ( )
   PRINT_LN( ); 
 }
 
-// handles a single incoming character in character input mode, returns 1 if program termination is requested
+/** @brief  This function handles a single incoming character in character input mode.
+ * \return  1 if program termination is requested, otherwise 0
+ */
 int8_t handleCharInput ( char key )
 {
   if ( key < 33 || key >= 126 ) // skip all control characters and DEL  
@@ -691,10 +753,15 @@ int8_t handleCharInput ( char key )
   
   printState();
   return 0;
-
 }
 
-// Function checks the UART for received characters and interprets them, returns 1 if program termination is requested
+/******************************************************************************/
+/* Arduino helper functions                                                   */
+/******************************************************************************/
+
+/** @brief  Function checks the UART for received characters and interprets them
+ * \return  1 if program termination is requested, otherwise 0
+ */
 int8_t serialInput ( )
 {
   char rx;
@@ -718,11 +785,8 @@ int8_t serialInput ( )
   return 0;     // rx must be 0 to leave while loop
 }
 
-/******************************************************************************/
-/* Arduino Setup and Loop Functions                                           */
-/******************************************************************************/
-
-// resets the status of the set application
+/** @brief This function resets the status of the application
+ */
 void resetAppState ( )
 {
   stateTmf8829 = TMF8829_STATE_DISABLED;
@@ -731,15 +795,17 @@ void resetAppState ( )
   irqTriggered = 0;
 }
 
-// interrupt handler is called when INT pin goes low
+/** @brief Interrupt handler is called when INT pin goes low.
+ */
 void interruptHandler ( void )
 {
   irqTriggered = 1;
 }
 
-// -------------------------------------------------------------------------------------------------------------
+/******************************************************************************/
+/* Arduino specific functions                                                 */
+/******************************************************************************/
 
-// Arduino setup function is only called once at startup. Do all the HW initialisation stuff here.
 void setupFn( uint8_t logLevelIdx, uint32_t baudrate, uint32_t i2cClockSpeedInHz )
 {
   logLevel = logLevelIdx;
@@ -758,7 +824,6 @@ void setupFn( uint8_t logLevelIdx, uint32_t baudrate, uint32_t i2cClockSpeedInHz
   printHelp();
 }
 
-// Arduino main loop function, is executed cyclic
 int8_t loopFn ( )
 {
   int8_t res = APP_SUCCESS_OK;
