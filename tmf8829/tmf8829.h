@@ -1,5 +1,5 @@
 /**************************************************************************************************
-* Copyright © 2024 ams-OSRAM AG                                                                   *
+* Copyright ? 2024 ams-OSRAM AG                                                                   *
 * All rights are reserved.                                                                        *
 *                                                                                                 *
 * FOR FULL LICENSE TEXT SEE LICENSES-MIT.TXT                                                      *
@@ -29,10 +29,15 @@ extern "C" {
  *     .. some cleanup
  *     .. handleReceivedHistogramDataEnd added (not used in linux driver)
  *     .. clock correction could be done in driver
+ * 1.3 .. Motion and proximity interrupt added
+ * 1.4 .. tmf8829StopMeasurement add check for standby-timed mode
+ *     .. tmf8829DownloadFirmware powerup_select to RAM option 
+ *     .. wakeup with wait time and cpu ready check
+ *     .. tmf8829isDeviceWakeup added
 */
 
 #define TMF8829_DRIVER_MAJOR_VERSION  1
-#define TMF8829_DRIVER_MINOR_VERSION  2
+#define TMF8829_DRIVER_MINOR_VERSION  4
 
 // ---------------------------------------------- defines -----------------------------------------
 
@@ -65,7 +70,11 @@ extern "C" {
 
 /* Interrupt macros */
 #define TMF8829_APP_INT_RESULTS                 0x01  /**< a measurement result is ready for readout */
-#define TMF8829_APP_INT_HISTOGRAMS              0x08  /**< histogram results are ready for readout */
+#define TMF8829_APP_INT_MOTION                  0x02  /**< interrupt for motion detection            */
+#define TMF8829_APP_INT_PROXIMITY               0x04  /**< interrupt for proximity results           */
+#define TMF8829_APP_INT_HISTOGRAMS              0x08  /**< histogram results are ready for readout   */
+
+#define TMF8829_APP_INT_ALL       ( TMF8829_APP_INT_RESULTS | TMF8829_APP_INT_MOTION  | TMF8829_APP_INT_PROXIMITY | TMF8829_APP_INT_HISTOGRAMS )
 
 /* application registers */
 #define TMF8829_APP_ID                          0x01  /**<  major app version */
@@ -274,7 +283,12 @@ void tmf8829Standby( tmf8829Driver * driver );
  */ 
 void tmf8829PowerUp( tmf8829Driver * driver );
 
-/** @brief  Function to wake the device up from standby mode
+/** @brief  Function to check if device is wake up.
+ * driver ... pointer to an instance of the tmf8829 driver data structure
+ */ 
+int tmf8829isDeviceWakeup( tmf8829Driver * driver );
+
+/** @brief  Function to wake the device up from standby mode.
  * driver ... pointer to an instance of the tmf8829 driver data structure
  */ 
 void tmf8829Wakeup( tmf8829Driver * driver );
@@ -323,6 +337,7 @@ void tmf8829SetUint16( uint16_t value, uint8_t * data );
 
 /** @brief  Function to download the firmware image that was linked against the firmware (tmf8829_image.{h,c} files)
  * The function tmf8829BootloaderStartRamApp is executed after successful download.
+ * powerup_select in the ENABLE register to RAM
  * @param driver ... pointer to an instance of the tmf8829 driver data structure
  * @param imageStartAddress ... destination in RAM to which the image shall be downloaded
  * @param image ... pointer to the character array that represents the downloadable image
