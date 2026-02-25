@@ -841,15 +841,18 @@ int8_t loopFn ( )
   if ( stateTmf8829 == TMF8829_STATE_MEASURE )
   { 
 #endif
+    if (tmf8829isDeviceWakeup(&tmf8829))
+    {
+      intStatus = tmf8829GetAndClrInterrupts( &tmf8829, TMF8829_APP_INT_RESULTS | TMF8829_APP_INT_HISTOGRAMS );
 
-    intStatus = tmf8829GetAndClrInterrupts( &tmf8829, TMF8829_APP_INT_RESULTS | TMF8829_APP_INT_HISTOGRAMS );
-    if ( intStatus & TMF8829_APP_INT_RESULTS )   // check if a result is available
-    {
-      res = tmf8829ReadResults( &tmf8829 );
-    }
-    if ( intStatus & TMF8829_APP_INT_HISTOGRAMS )
-    {
-      res = tmf8829ReadHistogram( &tmf8829);
+      if ( intStatus & TMF8829_APP_INT_RESULTS )   // check if a result is available
+      {
+        res = tmf8829ReadResults( &tmf8829 );
+      }
+      if ( intStatus & TMF8829_APP_INT_HISTOGRAMS )
+      {
+        res = tmf8829ReadHistogram( &tmf8829);
+      }
     }
 
   }
