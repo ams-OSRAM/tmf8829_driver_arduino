@@ -1,10 +1,12 @@
-/**************************************************************************************************
-* Copyright © 2024 ams-OSRAM AG                                                                   *
-* All rights are reserved.                                                                        *
-*                                                                                                 *
-* FOR FULL LICENSE TEXT SEE LICENSES-MIT.TXT                                                      *
-*                                                                                                 *
-**************************************************************************************************/
+/*
+ ************************************************************************************
+ * Copyright (c) [2025] ams-OSRAM AG                                                *
+ *                                                                                  *
+ * SPDX-License-Identifier: GPL-2.0 OR MIT                                          *
+ *                                                                                  *
+ * For the full license texts, see LICENSES-GPL-2.0.txt or LICENSES-MIT.TXT.        *
+ ************************************************************************************
+*/
 
 /* simple TMF8829 driver */
 
@@ -245,8 +247,6 @@ void tmf8829Initialise ( tmf8829Driver * driver )
   driver->device = tmf8829DeviceInfoReset;
   driver->info = tmf8829DriverInfoReset;
   driver->i2cSlaveAddress = TMF8829_SLAVE_ADDR;
-  driver->spiWriteCommand = SPI_WR_CMD;
-  driver->spiWriteCommand = SPI_RD_CMD;
   driver->clkCorrectionEnable = 1;
   driver->logLevel =TMF8829_LOG_LEVEL_ERROR;
   memset(driver->dataBuffer, 0, DATA_BUFFER_SIZE);
@@ -496,7 +496,7 @@ int8_t tmf8829BootloaderCmdI2cOff ( tmf8829Driver * driver )
 }
 
 // execute command to set the RAM address pointer for RAM read/writes
-static int8_t tmf8829BootloaderSetRamAddr ( tmf8829Driver * driver, uint32_t addr )
+int8_t tmf8829BootloaderSetRamAddr ( tmf8829Driver * driver, uint32_t addr )
 {
   driver->dataBuffer[0] = TMF8829_COM_BL_CMD_STAT_ADDR_RAM;
   driver->dataBuffer[1] = 4; // payload
@@ -510,7 +510,7 @@ static int8_t tmf8829BootloaderSetRamAddr ( tmf8829Driver * driver, uint32_t add
 }
 
 // writes to both CPU RAMs in parallel
-static int8_t tmf8829BootloaderWriteRamBoth ( tmf8829Driver * driver, uint8_t len )
+int8_t tmf8829BootloaderWriteRamBoth ( tmf8829Driver * driver, uint8_t len )
 {
   driver->dataBuffer[0] = TMF8829_COM_BL_CMD_STAT_W_RAM_BOTH;
   driver->dataBuffer[1] = len; // payload
@@ -535,11 +535,32 @@ static int8_t tmf8829BootloaderWriteFifoBoth ( tmf8829Driver * driver, uint32_t 
 }
 
 //to start the down-loaded measurement application
-static int8_t tmf8829BootloaderStartRamApp ( tmf8829Driver * driver )
+int8_t tmf8829BootloaderStartRamApp ( tmf8829Driver * driver )
 { 
   driver->dataBuffer[0] = TMF8829_COM_BL_CMD_STAT_START_RAM_APP;
   txReg( driver, driver->i2cSlaveAddress, TMF8829_COM_REG_CMD_STAT, 1, driver->dataBuffer );
   return tmf8829CheckRegister( driver, TMF8829_COM_REG_APP_ID, TMF8829_COM_APP_ID__application, 1, BL_CMD_START_RAM_APP_MS );
+}
+
+int8_t tmf8829BootloaderStartRamAppAndPowerOn ( tmf8829Driver * driver )
+{
+  int8_t stat = BL_SUCCESS_OK;
+  stat = tmf8829BootloaderStartRamApp( driver );
+  if ( stat == BL_SUCCESS_OK )
+  {
+    if ( driver->logLevel >=TMF8829_LOG_LEVEL_INFO )
+    {
+      PRINT_STR( "Ram started" );
+      PRINT_LN( );
+    }
+    // Enable Register with RAM in powerup_select
+    driver->dataBuffer[0] = 0; // clear before reading
+    rxReg( driver, driver->i2cSlaveAddress, ENABLE, 1, driver->dataBuffer );
+    driver->dataBuffer[0] = driver->dataBuffer[0] & ( ~TMF8829_ENABLE__powerup_select__MASK ); // clear powerup_select
+    driver->dataBuffer[0] = driver->dataBuffer[0] | ( ENABLE__powerup_select__RAM << ENABLE__powerup_select__SHIFT ); // select RAM
+    txReg( driver, driver->i2cSlaveAddress, ENABLE, 1, driver->dataBuffer ); // set PON bit in enable register
+  }
+  return stat;
 }
 
 int8_t tmf8829DownloadFirmware ( tmf8829Driver * driver, uint32_t imageStartAddress, const uint8_t * image, int32_t imageSizeInBytes, uint8_t useFifo )
@@ -726,7 +747,7 @@ static void tmf8829ClockCorrectionAddPair ( tmf8829Driver * driver, uint32_t hos
     PRINT_LN( );                              
   }                                             
     
-}  
+}
 
 int8_t tmf8829ReadDeviceInfo ( tmf8829Driver * driver )
 {
@@ -796,11 +817,69 @@ int8_t tmf8829GetConfiguration (tmf8829Driver * driver)
   return stat;
 }
 
+int8_t tmf8829GetConfigurationInSegments (tmf8829Driver * driver, uint16_t segment_size)
+{
+  int8_t stat = tmf8829CmdLoadConfigPage( driver ); // first load the page, then only overwrite the registers you want to change 
+  uint16_t totalBlocks = TMF8829_CFG_PAGE_SIZE/segment_size;
+  uint16_t remainingBytes = TMF8829_CFG_PAGE_SIZE%segment_size;
+
+  if ( stat == APP_SUCCESS_OK )
+  {
+    for(uint8_t index = 0; index < totalBlocks; index++){
+      rxReg( driver, driver->i2cSlaveAddress, TMF8829_CFG_PERIOD_MS_LSB+(index*segment_size), segment_size, &driver->config[index*segment_size]);
+    }
+    if(remainingBytes > 0){
+      rxReg( driver, driver->i2cSlaveAddress, TMF8829_CFG_PERIOD_MS_LSB+(totalBlocks*segment_size), remainingBytes, &driver->config[totalBlocks*segment_size]);
+    }
+  }
+  if ( stat != APP_SUCCESS_OK )
+  {
+    if ( driver->logLevel >=TMF8829_LOG_LEVEL_ERROR )
+    {
+      PRINT_STR( "#Err" );
+      PRINT_CHAR( SEPARATOR );
+      PRINT_STR( " Get Configuration " );
+      PRINT_INT( stat );
+      PRINT_LN( );
+    }
+  }
+  return stat;
+}
+
 int8_t tmf8829SetConfiguration ( tmf8829Driver * driver )
 {
   int8_t stat = APP_ERROR_PARAM;
 
   txReg( driver, driver->i2cSlaveAddress, TMF8829_CFG_PERIOD_MS_LSB, TMF8829_CFG_PAGE_SIZE, driver->config );
+  stat = tmf8829CmdWritePage( driver );  // as a last step write the config page back
+
+  if ( stat != APP_SUCCESS_OK )
+  {
+    if ( driver->logLevel >=TMF8829_LOG_LEVEL_ERROR )
+    {
+      PRINT_STR( "#Err" );
+      PRINT_CHAR( SEPARATOR );
+      PRINT_STR( "Config " );
+      PRINT_INT( stat );
+      PRINT_LN( );
+    }
+  }
+  return stat;
+}
+
+int8_t tmf8829SetConfigurationInSegments ( tmf8829Driver * driver, uint16_t segment_size)
+{
+  int8_t stat = APP_ERROR_PARAM;
+  uint16_t totalBlocks = TMF8829_CFG_PAGE_SIZE/segment_size;
+  uint16_t remainingBytes = TMF8829_CFG_PAGE_SIZE%segment_size;
+
+  for(uint8_t index = 0; index < totalBlocks; index++){
+    txReg( driver, driver->i2cSlaveAddress, TMF8829_CFG_PERIOD_MS_LSB+(index*segment_size), segment_size, &driver->config[index*segment_size]);
+  }
+  if(remainingBytes > 0){
+    txReg( driver, driver->i2cSlaveAddress, TMF8829_CFG_PERIOD_MS_LSB+(totalBlocks*segment_size), remainingBytes, &driver->config[totalBlocks*segment_size]);
+  }
+
   stat = tmf8829CmdWritePage( driver );  // as a last step write the config page back
 
   if ( stat != APP_SUCCESS_OK )

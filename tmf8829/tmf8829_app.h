@@ -22,8 +22,8 @@
  * @param  i2cClockSpeedInHz ... the i2c frequency
  */
 void setupFn( uint8_t logLevelIdx, uint32_t baudrate, uint32_t i2cClockSpeedInHz );
-/** @brief Arduino main loop function, is executed cyclic.
 
+/** @brief Arduino main loop function, is executed cyclic.
  * @return 1 if wants to be called again
  * @return 0 if program should terminate
  */

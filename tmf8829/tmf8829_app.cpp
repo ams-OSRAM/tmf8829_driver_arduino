@@ -20,9 +20,11 @@
  * 1 .. update to clock correction feature
  * 2 .. new image file
  * 3 .. new image file 1.2.194
-     .. more documentation added to application 
+     .. more documentation added to application
+ * 4 .. stand by timed support
+ * 5 .. new hex file
 */
-#define TMF8829_APPLICATION_MINOR_VERSION    3
+#define TMF8829_APPLICATION_MINOR_VERSION    5
 
 
 #define NR_OF_MEAS_CFGS 9 /**< number of preconfiguration commands that are available, see TMF8829_CMD_STAT */
