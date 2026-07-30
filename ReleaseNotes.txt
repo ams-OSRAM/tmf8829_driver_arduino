@@ -38,3 +38,6 @@ v1.2.3
 
 v1.2.4
 - standby timed support
+
+v1.2.5
+- new hex file 1.2.200
